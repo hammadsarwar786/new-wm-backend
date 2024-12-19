@@ -21,6 +21,7 @@ const adminRegister = async (req, res) => {
     } else {
       // Hash the password
       const hashedPassword = await bcrypt.hash(password, 10);
+
       // Create a new user
       const user = new User({
         username,
@@ -164,42 +165,93 @@ const deleteMany = async (req, res) => {
   }
 };
 
+// const edit = async (req, res) => {
+//   try {
+//     let { username, firstName, target, lastName, phoneNumber, parent, password="" ,coins} =
+//       req.body;
+
+//       const updatedObj =  {
+//           username,
+//           firstName,
+//           lastName,
+//           phoneNumber,
+//           target,
+//           parent,
+//           coins
+//         };
+
+//         if(password.trim()) {
+//           const hashedPassword = await bcrypt.hash(password, 10);
+//           updatedObj['password'] = hashedPassword;
+//         }
+
+//     let result = await User.updateOne(
+//       { _id: req.params.id },
+//       {
+//         $set: updatedObj,
+//       }
+//     );
+
+//     res.status(200).json(result);
+//   } catch (err) {
+//     console.error("Failed to Update User:", err);
+//     res.status(400).json({ error: "Failed to Update User" });
+//   }
+// };
+
 const edit = async (req, res) => {
   try {
-    let { username, firstName, target, lastName, phoneNumber, parent, password="" ,coins} =
-      req.body;
+    let {
+      username,
+      firstName,
+      lastName,
+      target,
+      phoneNumber,
+      parent,
+      password = "",
+      coins,
+    } = req.body;
 
-      const updatedObj =  {
-          username,
-          firstName,
-          lastName,
-          phoneNumber,
-          target,
-          parent,
-          coins
-        }; 
+    const updatedObj = {};
 
-        if(password.trim()) {
-          const hashedPassword = await bcrypt.hash(password, 10);
-          updatedObj['password'] = hashedPassword; 
-        }
+    // Dynamically add only fields that are defined and non-empty
+    if (username) updatedObj.username = username;
+    if (firstName) updatedObj.firstName = firstName;
+    if (lastName) updatedObj.lastName = lastName;
+    if (phoneNumber) updatedObj.phoneNumber = phoneNumber;
+    if (target) updatedObj.target = target;
+    if (coins) updatedObj.coins = coins;
 
+    // Handle the `parent` field, checking if it's not an empty string
+    if (parent) {
+      updatedObj.parent = parent;
+    }
+
+    // If password is provided and not empty, hash it and include in update
+    if (password.trim()) {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      updatedObj.password = hashedPassword;
+    }
+
+    // If no fields to update, return an error
+    if (Object.keys(updatedObj).length === 0) {
+      return res.status(400).json({ error: "No fields provided for update" });
+    }
+
+    // Perform the update
     let result = await User.updateOne(
       { _id: req.params.id },
-      {
-        $set: updatedObj,
-      }
+      { $set: updatedObj }
     );
 
     res.status(200).json(result);
   } catch (err) {
     console.error("Failed to Update User:", err);
-    res.status(400).json({ error: "Failed to Update User" });
+    res.status(400).json({ error: "Failed to Update User", detail: err });
   }
 };
 
 const getTree = async (req, res) => {
-
   try {
     const allUsers = await User.find({ deleted: false }).populate({
       path: "roles",
@@ -224,6 +276,23 @@ const getTree = async (req, res) => {
   } catch (error) {
     console.error("Failed to fetch Users tree:", error);
     res.status(400).json({ error: "Failed to Fetch Users tree" });
+  }
+};
+const addCoins = async (req, res) => {
+  try {
+    let { coins } = req.body;
+
+    let result = await User.updateOne(
+      { _id: req.params.id },
+      {
+        $inc: { coins },
+      }
+    );
+
+    res.status(200).json(result);
+  } catch (err) {
+    console.error("Failed to Update User:", err);
+    res.status(400).json({ error: "Failed to Update User" });
   }
 };
 
@@ -370,6 +439,23 @@ const getUsersView = async (req, res) => {
     res.status(400).json({ error: "Failed to fetch users view" });
   }
 };
+const removeCoins = async (req, res) => {
+  try {
+    let { coins } = req.body;
+
+    let result = await User.updateOne(
+      { _id: req.params.id },
+      {
+        $inc: { coins: -1 * Number(coins) },
+      }
+    );
+
+    res.status(200).json(result);
+  } catch (err) {
+    console.error("Failed to Update User:", err);
+    res.status(400).json({ error: "Failed to Update User" });
+  }
+};
 
 const autoAssign = async (req, res) => {
   const agents = req.body.agents;
@@ -444,4 +530,6 @@ module.exports = {
   edit,
   changeRoles,
   autoAssign,
+  addCoins,
+  removeCoins,
 };

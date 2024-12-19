@@ -11,6 +11,8 @@ router.post('/login', user.login)
 router.post('/deleteMany', auth, user.deleteMany)
 router.get('/view/:id', auth, user.view)
 router.delete('/delete/:id', auth, user.deleteData)
+router.post('/addCoins/:id', auth, user.addCoins)
+router.post('/removeCoins/:id', auth, user.removeCoins)
 router.put('/edit/:id', auth, user.edit)
 router.put('/change-roles/:id', auth, user.changeRoles)
 router.get('/tree', auth, user.getTree); 

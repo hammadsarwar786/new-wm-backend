@@ -16,6 +16,7 @@ router.put("/edit/:id", auth, lead.edit);
 router.put("/changeStatus/:id", auth, lead.changeStatus);
 
 router.put("/update/e-status/:id", auth, lead.changeEStatus);
+
 router.delete("/delete/:id", auth, lead.deleteData);
 router.post("/deleteMany", auth, lead.deleteMany);
 module.exports = router;

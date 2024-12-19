@@ -134,15 +134,52 @@ const index = async (req, res) => {
 		}
 	}
 
+	// if (isInLeadPool === 'true') {
+	//   const leadsInAdminApproval = await AdminApproval.find().select('leadId').lean();
+	//   const leadIdsInAdminApproval = leadsInAdminApproval.map(approval => approval.leadId);
+
+	//   q["_id"] = { $nin: leadIdsInAdminApproval }; // Exclude leads in AdminApproval
+	// }
+
 	if (isInLeadPool === "true") {
-		const leadsInAdminApproval = await AdminApproval.find()
+		q.$and = [];
+		// Fetch only the leadIds where approvalStatus is not "rejected"
+		q.$and.push({
+			$or: [
+				{ agentAssigned: { $exists: false } }, // Field does not exist
+				{ agentAssigned: null }, // Field is null
+				{ agentAssigned: "" }, // Field is an empty string
+			],
+		});
+		q.$and.push({
+			$or: [
+				{ managerAssigned: { $exists: false } }, // Field does not exist
+				{ managerAssigned: null }, // Field is null
+				{ managerAssigned: "" }, // Field is an empty string
+			],
+		});
+		const leadsInAdminApproval = await AdminApproval.find({
+			approvalStatus: { $ne: "Rejected" },
+		})
 			.select("leadId")
 			.lean();
+
 		const leadIdsInAdminApproval = leadsInAdminApproval.map(
 			(approval) => approval.leadId
 		);
 
-		q["_id"] = { $nin: leadIdsInAdminApproval }; // Exclude leads in AdminApproval
+		// Exclude the leads where approvalStatus is not "rejected"
+		q["_id"] = { $nin: leadIdsInAdminApproval };
+
+		// Optionally, if you need to include rejected approvals in your final results:
+		// const rejectedLeads = await AdminApproval.find({
+		//   approvalStatus: "Rejected",
+		// })
+		//   .select("leadId")
+		//   .lean();
+		// const rejectedLeadIds = rejectedLeads.map((approval) => approval.leadId);
+
+		// If you want to specifically include the rejected leads somewhere in your query, you can handle them as needed here.
 	}
 
 	let allData = [];
@@ -205,7 +242,8 @@ const search = async (req, res) => {
 	const query = req.query;
 	const role = query?.role;
 	const userID = query.user;
-
+	const isInLeadPool = query.isInLeadPool;
+	console.log(isInLeadPool, "isInleadPool");
 	if (role) {
 		delete query["role"];
 	}
@@ -235,7 +273,10 @@ const search = async (req, res) => {
 	let totalRecords = 0;
 
 	if (role === "Manager") {
-		allData = await Lead.find({ ...q, managerAssigned: userID })
+		allData = await Lead.find({
+			...q,
+			...(!isInLeadPool ? { managerAssigned: userID } : {}),
+		})
 			.populate({
 				path: "createBy",
 				match: { deleted: false }, // Populate only if createBy.deleted is false
@@ -249,7 +290,10 @@ const search = async (req, res) => {
 			managerAssigned: userID,
 		}).countDocuments();
 	} else if (role === "Agent") {
-		allData = await Lead.find({ ...q, agentAssigned: userID })
+		allData = await Lead.find({
+			...q,
+			...(!isInLeadPool ? { agentAssigned: userID } : {}),
+		})
 			.populate({
 				path: "createBy",
 				match: { deleted: false }, // Populate only if createBy.deleted is false
@@ -280,113 +324,314 @@ const search = async (req, res) => {
 	res.json({ result, totalPages, totalLeads: totalRecords });
 };
 
+// const advancedSearch = async (req, res) => {
+//   const query = req.query;
+//   const role = query?.role;
+//   const userID = query.user;
+//   const isInLeadPool = query.isInLeadPool;
+//   // console.log(query.data?.buyAble,"data in advance search")
+
+//   if (role) {
+//     delete query["role"];
+//   }
+
+//   const data = JSON.parse(query?.data || {});
+//   const filters = [];
+
+//   if (data?.leadName) {
+//     filters.push({ leadName: data?.leadName });
+//   }
+//   if (data?.leadStatus) {
+//     filters.push({ leadStatus: data?.leadStatus });
+//   }
+//   if (data?.leadEmail) {
+//     filters.push({ leadEmail: data?.leadEmail });
+//   }
+//   if (data?.leadPhoneNumber) {
+//     filters.push({ leadPhoneNumber: data?.leadPhoneNumber });
+//   }
+//   if (data?.nationality) {
+//     filters.push({ nationality: data?.nationality });
+//   }
+//   if (data?.timetocall) {
+//     filters.push({ timetocall: data?.timetocall });
+//   }
+//   if (data?.r_u_in_uae) {
+//     filters.push({ r_u_in_uae: data?.r_u_in_uae });
+//   }
+//   if (data?.leadSource) {
+//     filters.push({ leadSource: data?.leadSource });
+//     filters.push({ leadSourceMedium: data?.leadSource });
+//   }
+//   if (data?.leadAddress) {
+//     filters.push({ leadAddress: data?.leadAddress });
+//   }
+//   if (data?.leadCampaign) {
+//     filters.push({ leadCampaign: data?.leadCampaign });
+//   }
+//   if (data?.leadWhatsappNumber) {
+//     filters.push({ leadWhatsappNumber: data?.leadWhatsappNumber });
+//   }
+//   if (data?.ip) {
+//     filters.push({ ip: data?.ip });
+//   }
+//   if (data?.managerAssigned == -1) {
+//     filters.push({
+//       $or: [
+//         { managerAssigned: { $exists: false } }, // Field does not exist
+//         { managerAssigned: null }, // Field is null
+//         { managerAssigned: "" }, // Field is an empty string
+//       ],
+//     });
+//   } else if (data?.managerAssigned) {
+//     filters.push({ managerAssigned: data?.managerAssigned });
+//   }
+//   if (data?.agentAssigned == -1) {
+//     filters.push({
+//       $or: [
+//         { agentAssigned: { $exists: false } }, // Field does not exist
+//         { agentAssigned: null }, // Field is null
+//         { agentAssigned: "" }, // Field is an empty string
+//       ],
+//     });
+//   } else if (data?.agentAssigned) {
+//     filters.push({ agentAssigned: data?.agentAssigned });
+//   } else if (data?.buyAble) {
+//     filters.push({
+//       // $or:[
+//       //   { agentAssigned: { $exists: false } }, // Field does not exist
+//       //   { agentAssigned: null }, // Field is null
+//       //   { agentAssigned: "" },
+//       //   { managerAssigned: { $exists: false } }, // Field does not exist
+//       //   { managerAssigned: null }, // Field is null
+//       //   { managerAssigned: "" },
+//       // ]
+//       $and: [
+//         {
+//           $or: [
+//             { agentAssigned: { $exists: false } }, // Field does not exist
+//             { agentAssigned: null }, // Field is null
+//             { agentAssigned: "" }, // Field is an empty string
+//           ],
+//         },
+//         {
+//           $or: [
+//             { managerAssigned: { $exists: false } }, // Field does not exist
+//             { managerAssigned: null }, // Field is null
+//             { managerAssigned: "" }, // Field is an empty string
+//           ],
+//         },
+//       ],
+//     });
+//   }
+
+//   const q = {
+//     deleted: false,
+//     $and: filters,
+//   };
+
+//   let allData = [];
+
+//   let offset = 0;
+//   let limit = 10;
+//   if (req.query?.page !== 0) {
+//     offset = (Number(req.query?.page) - 1) * Number(req.query?.pageSize || 10);
+//     limit = Number(req.query?.pageSize) || 10;
+//   }
+
+//   let totalRecords = 0;
+
+//   if (role === "Manager") {
+//     allData = await Lead.find({
+//       ...q,
+//       ...(!isInLeadPool ? { managerAssigned: userID } : {}),
+//     })
+//       .populate({
+//         path: "createBy",
+//         match: { deleted: false }, // Populate only if createBy.deleted is false
+//       })
+//       .sort({ createdDate: -1 })
+//       .skip(offset)
+//       .limit(limit)
+//       .exec();
+//     totalRecords = await Lead.find({
+//       ...q,
+//       managerAssigned: userID,
+//     }).countDocuments();
+//   } else if (role === "Agent") {
+//     allData = await Lead.find({
+//       ...q,
+//       ...(!isInLeadPool ? { agentAssigned: userID } : {}),
+//     })
+//       .populate({
+//         path: "createBy",
+//         match: { deleted: false }, // Populate only if createBy.deleted is false
+//       })
+//       .sort({ createdDate: -1 })
+//       .skip(offset)
+//       .limit(limit)
+//       .exec();
+//     totalRecords = await Lead.find({
+//       ...q,
+//       agentAssigned: userID,
+//     }).countDocuments();
+//   } else {
+//     allData = await Lead.find({ ...q })
+//       .populate({
+//         path: "createBy",
+//         match: { deleted: false }, // Populate only if createBy.deleted is false
+//       })
+//       .sort({ createdDate: -1 })
+//       .skip(offset)
+//       .limit(limit)
+//       .exec();
+//     totalRecords = await Lead.find(q).countDocuments();
+//   }
+
+//   const result = allData;
+//   const totalPages = Math.ceil(totalRecords / (req.query?.pageSize || 10));
+//   res.json({ result, totalPages, totalLeads: totalRecords });
+// };
 const advancedSearch = async (req, res) => {
 	const query = req.query;
 	const role = query?.role;
-	const userID = query.user;
-
-	if (role) {
-		delete query["role"];
-	}
-
+	const userID = query?.user;
+	const isInLeadPool = query?.isInLeadPool;
 	const data = JSON.parse(query?.data || {});
-	const filters = [];
 
-	if (data?.leadName) {
-		filters.push({ leadName: data?.leadName });
-	}
-	if (data?.leadStatus) {
-		filters.push({ leadStatus: data?.leadStatus });
-	}
-	if (data?.leadEmail) {
-		filters.push({ leadEmail: data?.leadEmail });
-	}
-	if (data?.leadPhoneNumber) {
-		filters.push({ leadPhoneNumber: data?.leadPhoneNumber });
-	}
-	if (data?.managerAssigned == -1) {
-		filters.push({
-			$or: [
-				{ managerAssigned: { $exists: false } }, // Field does not exist
-				{ managerAssigned: null }, // Field is null
-				{ managerAssigned: "" }, // Field is an empty string
-			],
-		});
-	} else if (data?.managerAssigned) {
-		filters.push({ managerAssigned: data?.managerAssigned });
-	}
-	if (data?.agentAssigned == -1) {
-		filters.push({
-			$or: [
-				{ agentAssigned: { $exists: false } }, // Field does not exist
-				{ agentAssigned: null }, // Field is null
-				{ agentAssigned: "" }, // Field is an empty string
-			],
-		});
-	} else if (data?.agentAssigned) {
-		filters.push({ agentAssigned: data?.agentAssigned });
-	}
+	// Remove the role from the query as it's handled separately
+	if (role) delete query["role"];
 
-	const q = {
-		deleted: false,
-		$and: filters,
+	// Initialize an array to store filters
+	const filters = [{ deleted: false }];
+
+	// Helper function to add case-insensitive regex filters
+	const addRegexFilter = (field, value) => {
+		if (value) {
+			filters.push({ [field]: { $regex: new RegExp(value, "i") } });
+		}
 	};
 
+	// Add filters based on data
+	addRegexFilter("leadName", data?.leadName);
+	addRegexFilter("leadStatus", data?.leadStatus);
+	addRegexFilter("leadEmail", data?.leadEmail);
+	addRegexFilter("leadPhoneNumber", data?.leadPhoneNumber);
+	addRegexFilter("nationality", data?.nationality);
+	addRegexFilter("leadSource", data?.leadSource);
+	addRegexFilter("leadSourceMedium", data?.leadSource);
+	addRegexFilter("leadAddress", data?.leadAddress);
+	addRegexFilter("leadCampaign", data?.leadCampaign);
+	addRegexFilter("leadWhatsappNumber", data?.leadWhatsappNumber);
+	addRegexFilter("ip", data?.ip);
+
+	// Direct match fields
+	if (data?.timetocall) filters.push({ timetocall: data.timetocall });
+	if (data?.r_u_in_uae) filters.push({ r_u_in_uae: data.r_u_in_uae });
+
+	// Helper function to handle the assignment logic
+	const addAssignmentFilter = (field, value) => {
+		if (value === -1) {
+			filters.push({
+				$or: [
+					{ [field]: { $exists: false } },
+					{ [field]: null },
+					{ [field]: "" },
+				],
+			});
+		} else if (value) {
+			filters.push({ [field]: value });
+		}
+	};
+
+	// Handle assignment filters
+	addAssignmentFilter("managerAssigned", data?.managerAssigned);
+	addAssignmentFilter("agentAssigned", data?.agentAssigned);
+
+	// Special case for buyAble logic
+	if (data?.buyAble) {
+		filters.push({
+			$and: [
+				{
+					$or: [
+						{ agentAssigned: { $exists: false } },
+						{ agentAssigned: null },
+						{ agentAssigned: "" },
+					],
+				},
+				{
+					$or: [
+						{ managerAssigned: { $exists: false } },
+						{ managerAssigned: null },
+						{ managerAssigned: "" },
+					],
+				},
+			],
+		});
+	}
+
+	// Create the final query object
+	const q = { $and: filters };
+
+	// Pagination logic
+	const page = Number(req.query?.page) || 1;
+	const pageSize = Number(req.query?.pageSize) || 10;
+	const offset = (page - 1) * pageSize;
+
+	// Base query options
+	let totalRecords = 0;
 	let allData = [];
 
-	let offset = 0;
-	let limit = 10;
-	if (req.query?.page !== 0) {
-		offset = (Number(req.query?.page) - 1) * Number(req.query?.pageSize || 10);
-		limit = Number(req.query?.pageSize) || 10;
-	}
+	const commonOptions = {
+		populate: {
+			path: "createBy",
+			match: { deleted: false },
+		},
+		sort: { createdDate: -1 },
+		skip: offset,
+		limit: pageSize,
+	};
 
-	let totalRecords = 0;
-
+	// Role-based queries
 	if (role === "Manager") {
-		allData = await Lead.find({ ...q, managerAssigned: userID })
-			.populate({
-				path: "createBy",
-				match: { deleted: false }, // Populate only if createBy.deleted is false
-			})
-			.sort({ createdDate: -1 })
-			.skip(offset)
-			.limit(limit)
-			.exec();
-		totalRecords = await Lead.find({
+		const managerQuery = {
 			...q,
-			managerAssigned: userID,
-		}).countDocuments();
+			...(!isInLeadPool ? { managerAssigned: userID } : {}),
+		};
+		allData = await Lead.find(managerQuery)
+			.populate(commonOptions.populate)
+			.sort(commonOptions.sort)
+			.skip(commonOptions.skip)
+			.limit(commonOptions.limit)
+			.exec();
+		totalRecords = await Lead.countDocuments({ ...q, managerAssigned: userID });
 	} else if (role === "Agent") {
-		allData = await Lead.find({ ...q, agentAssigned: userID })
-			.populate({
-				path: "createBy",
-				match: { deleted: false }, // Populate only if createBy.deleted is false
-			})
-			.sort({ createdDate: -1 })
-			.skip(offset)
-			.limit(limit)
-			.exec();
-		totalRecords = await Lead.find({
+		const agentQuery = {
 			...q,
-			agentAssigned: userID,
-		}).countDocuments();
-	} else {
-		allData = await Lead.find({ ...q })
-			.populate({
-				path: "createBy",
-				match: { deleted: false }, // Populate only if createBy.deleted is false
-			})
-			.sort({ createdDate: -1 })
-			.skip(offset)
-			.limit(limit)
+			...(!isInLeadPool ? { agentAssigned: userID } : {}),
+		};
+		allData = await Lead.find(agentQuery)
+			.populate(commonOptions.populate)
+			.sort(commonOptions.sort)
+			.skip(commonOptions.skip)
+			.limit(commonOptions.limit)
 			.exec();
-		totalRecords = await Lead.find(q).countDocuments();
+		totalRecords = await Lead.countDocuments({ ...q, agentAssigned: userID });
+	} else {
+		allData = await Lead.find(q)
+			.populate(commonOptions.populate)
+			.sort(commonOptions.sort)
+			.skip(commonOptions.skip)
+			.limit(commonOptions.limit)
+			.exec();
+		totalRecords = await Lead.countDocuments(q);
 	}
 
-	const result = allData;
-	const totalPages = Math.ceil(totalRecords / (req.query?.pageSize || 10));
-	res.json({ result, totalPages, totalLeads: totalRecords });
+	// Calculate total pages
+	const totalPages = Math.ceil(totalRecords / pageSize);
+
+	// Send the response
+	res.json({ result: allData, totalPages, totalLeads: totalRecords });
 };
 
 const addMany = async (req, res) => {
@@ -631,6 +876,10 @@ const history = async (req, res) => {
 
 const edit = async (req, res) => {
 	try {
+		if (req.body.agentAssigned) {
+			const agent = await User.findOne({ _id: req.body.agentAssigned });
+			req.body.managerAssigned = agent?.parent;
+		}
 		let result = await Lead.updateOne(
 			{ _id: req.params.id },
 			{ $set: req.body }

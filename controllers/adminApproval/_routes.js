@@ -1,12 +1,12 @@
-const express = require('express');
-const adminApproval = require('./adminApproval');
-const auth = require('../../middelwares/auth');
+const express = require("express");
+const adminApproval = require("./adminApproval");
+const auth = require("../../middelwares/auth");
 
 const router = express.Router();
 
-router.post('/add',auth, adminApproval.add);
-router.get('/get',auth, adminApproval.get);
-router.put('/update',auth, adminApproval.responseFromAdmin);
+router.post("/add", auth, adminApproval.add);
+router.get("/get", auth, adminApproval.get);
+router.put("/update", auth, adminApproval.responseFromAdmin);
+router.post("/delete", auth, adminApproval.deleteRequest);
 
-
-module.exports = router  
+module.exports = router;
