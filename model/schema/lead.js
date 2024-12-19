@@ -45,6 +45,12 @@ const leadSchema = new mongoose.Schema({
 		type: Date,
 		default: Date.now,
 	},
+	managerAssignedDate: {
+		type: Date,
+	},
+	agentAssignedDate: {
+		type: Date,
+	},
 	createBy: {
 		type: mongoose.Schema.ObjectId,
 		ref: "User",

@@ -112,6 +112,8 @@ const index = async (req, res) => {
 	const userID = query.user;
 	const isInLeadPool = query?.isInLeadPool;
 
+	console.log(role);
+
 	const dateTime = req.query?.dateTime?.split("|");
 	const isDateTime = dateTime?.some((d) => d);
 
@@ -198,7 +200,7 @@ const index = async (req, res) => {
 				path: "createBy",
 				match: { deleted: false }, // Populate only if createBy.deleted is false
 			})
-			.sort({ createdDate: -1 })
+			.sort({ managerAssignedDate: -1 })
 			.skip(offset)
 			.limit(limit)
 			.exec();
@@ -212,10 +214,11 @@ const index = async (req, res) => {
 				path: "createBy",
 				match: { deleted: false }, // Populate only if createBy.deleted is false
 			})
-			.sort({ createdDate: -1 })
+			.sort({ agentAssignedDate: -1 })
 			.skip(offset)
 			.limit(limit)
 			.exec();
+
 		totalRecords = await Lead.find({
 			...q,
 			agentAssigned: userID,
@@ -874,31 +877,84 @@ const history = async (req, res) => {
 	}
 };
 
+// const edit = async (req, res) => {
+// 	try {
+// 		if (req.body.agentAssigned) {
+// 			const agent = await User.findOne({ _id: req.body.agentAssigned });
+// 			req.body.managerAssigned = agent?.parent;
+// 		}
+// 		let result = await Lead.updateOne(
+// 			{ _id: req.params.id },
+// 			{ $set: req.body }
+// 		);
+
+// 		if (req.body?.agentAssigned || req.body?.managerAssigned) {
+// 			const userName = await User.findById(
+// 				req.body?.agentAssigned || req.body?.managerAssigned
+// 			);
+// 			const newLeadCycleUpdate = new LeadCycle({
+// 				type: req.body?.agentAssigned
+// 					? "assignment-agent"
+// 					: "assignment-manager",
+// 				leadID: req.params.id,
+// 				updatedData: userName.firstName + " " + userName.lastName,
+// 				updatedBy: req.user?.userId,
+// 			});
+// 			await newLeadCycleUpdate.save();
+// 		}
+// 		res.status(200).json(result);
+// 	} catch (err) {
+// 		console.error("Failed to Update Lead:", err);
+// 		res.status(400).json({ error: "Failed to Update Lead" });
+// 	}
+// };
+
 const edit = async (req, res) => {
 	try {
+		// Check if agent is assigned and derive the parent (manager) if necessary
 		if (req.body.agentAssigned) {
-			const agent = await User.findOne({ _id: req.body.agentAssigned });
-			req.body.managerAssigned = agent?.parent;
+			const agent = await User.findById(req.body.agentAssigned);
+			req.body.managerAssigned = agent?.parent; // Assuming "parent" is the manager's ID
 		}
-		let result = await Lead.updateOne(
+
+		// Prepare update object with assignment dates
+		const updateFields = { ...req.body };
+
+		// Update managerAssignedDate if manager is being assigned
+		if (req.body.managerAssigned) {
+			updateFields.managerAssignedDate = new Date();
+		}
+
+		// Update agentAssignedDate if agent is being assigned
+		if (req.body.agentAssigned) {
+			updateFields.agentAssignedDate = new Date();
+		}
+
+		// Update the lead document
+		const result = await Lead.updateOne(
 			{ _id: req.params.id },
-			{ $set: req.body }
+			{ $set: updateFields }
 		);
 
-		if (req.body?.agentAssigned || req.body?.managerAssigned) {
+		// Log lead assignment in the LeadCycle
+		if (req.body.agentAssigned || req.body.managerAssigned) {
 			const userName = await User.findById(
-				req.body?.agentAssigned || req.body?.managerAssigned
+				req.body.agentAssigned || req.body.managerAssigned
 			);
+
 			const newLeadCycleUpdate = new LeadCycle({
-				type: req.body?.agentAssigned
+				type: req.body.agentAssigned
 					? "assignment-agent"
 					: "assignment-manager",
 				leadID: req.params.id,
-				updatedData: userName.firstName + " " + userName.lastName,
+				updatedData: `${userName.firstName} ${userName.lastName}`,
 				updatedBy: req.user?.userId,
 			});
+
 			await newLeadCycleUpdate.save();
 		}
+
+		// Respond with success
 		res.status(200).json(result);
 	} catch (err) {
 		console.error("Failed to Update Lead:", err);
