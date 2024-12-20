@@ -3,16 +3,16 @@ const db = require('./db/config')
 const route = require('./controllers/route');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const port = process.env.PORT || 5000
 require('dotenv').config()
+const port = process.env.PORT || 5000
 const fs = require('fs');
 const path = require('path');
 
 //Setup Express App
 const app = express();
 // Middleware
-app.use(bodyParser.json({limit: '50mb'}));
-app.use(express.urlencoded({extended: true, limit: '50mb'}));
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Set up CORS  
 app.use(cors());
@@ -34,7 +34,7 @@ const server = app.listen(port, () => {
 
 
 // Connect to MongoDB
-console.log(process.env.DB_URL,"url of db")
+console.log(process.env.DB_URL, "url of db")
 const DATABASE_URL = process.env.DB_URL || 'mongodb://127.0.0.1:27017'
 const DATABASE = process.env.DB || 'crm'
 
