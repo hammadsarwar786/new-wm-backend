@@ -70,7 +70,7 @@ const lineChart = async (req, res) => {
     })
     .exec();
   let lead = [];
-  if (user.roles[0]?.roleName === "Manager") {
+  if (user?.roles[0]?.roleName == "Manager") {
     lead = await Lead.find({
       managerAssigned: user._id?.toString(),
       deleted: false,
