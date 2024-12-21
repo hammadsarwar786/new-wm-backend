@@ -500,7 +500,14 @@ const advancedSearch = async (req, res) => {
 	const role = query?.role;
 	const userID = query?.user;
 	const isInLeadPool = query?.isInLeadPool;
-	const data = JSON.parse(query?.data || {});
+	const data = query?.data ? JSON.parse(query?.data || {}) : null;
+
+	if (!data) {
+		return res.status(404).json({
+			status: "fail",
+			message: "Please add query data to search the data.",
+		});
+	}
 
 	// Remove the role from the query as it's handled separately
 	if (role) delete query["role"];
@@ -516,6 +523,10 @@ const advancedSearch = async (req, res) => {
 	};
 
 	// Add filters based on data
+	addRegexFilter("pageUrl", data?.pageUrl);
+	addRegexFilter("eLeadStatus", data?.eLeadStatus);
+	addRegexFilter("leadSourceDetails", data?.leadSourceDetails);
+
 	addRegexFilter("leadName", data?.leadName);
 	addRegexFilter("leadStatus", data?.leadStatus);
 	addRegexFilter("leadEmail", data?.leadEmail);
@@ -634,7 +645,12 @@ const advancedSearch = async (req, res) => {
 	const totalPages = Math.ceil(totalRecords / pageSize);
 
 	// Send the response
-	res.json({ result: allData, totalPages, totalLeads: totalRecords });
+	res.status(200).json({
+		message: "Advance search results",
+		totalPages,
+		totalLeads: totalRecords,
+		result: allData,
+	});
 };
 
 const addMany = async (req, res) => {
